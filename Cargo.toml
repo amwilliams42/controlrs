@@ -1,0 +1,8 @@
+[package]
+name = "controlrs"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+plotters = "0.3.7"
+rand = "0.8.5"
