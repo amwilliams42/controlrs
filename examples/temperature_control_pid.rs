@@ -8,7 +8,6 @@ struct ThermalSystem {
     heat_capacity: f32,
     heat_loss_factor: f32,
     delay_buffer: VecDeque<f32>,
-    delay_steps: usize,
 }
 
 impl ThermalSystem {
@@ -20,7 +19,6 @@ impl ThermalSystem {
             heat_capacity: 10.0,    // Very low heat capacity for faster response
             heat_loss_factor: 0.02, // Low heat loss for more pronounced effects
             delay_buffer: VecDeque::from(vec![0.0; delay_steps]),
-            delay_steps,
         }
     }
 
