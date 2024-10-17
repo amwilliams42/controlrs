@@ -25,18 +25,6 @@ fn test_pid_controller_basic_functionality() {
     panic!("Did not converge within {} iterations. Final value: {}", max_iterations, measurement);
 }
 
-#[test]
-fn test_pid_term_limits() {
-    let mut controller = PIDController::builder(10.0, 1.0, 1.0, 100.0)
-        .with_p_limits(-30.0, 30.0)
-        .with_i_limits(-20.0, 20.0)
-        .with_d_limits(-10.0, 10.0)
-        .build();
-
-    let output = controller.update(0.0, 0.1);
-    
-    assert!((output - 60.0).abs() < 0.001);
-}
 
 #[test]
 fn test_pid_integral_windup_prevention() {

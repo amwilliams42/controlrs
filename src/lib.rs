@@ -9,6 +9,7 @@ pub mod filters;
 pub use math::{Matrix3x3, Vector3};
 pub use control::PIDController;
 pub use filters::kalman::KalmanFilter;
+pub use filters::ekf::ExtendedKalmanFilter;
 
 pub trait Number:
     Sized + Copy + Debug + 

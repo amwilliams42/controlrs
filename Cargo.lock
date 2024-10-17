@@ -111,6 +111,7 @@ dependencies = [
  "nalgebra",
  "num-traits",
  "plotters",
+ "plotters-backend",
  "rand",
  "rand_distr",
 ]
