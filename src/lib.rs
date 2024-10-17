@@ -1,21 +1,25 @@
+use nalgebra::{RealField, ComplexField};
+use num_traits::{Float, FromPrimitive, ToPrimitive};
+use std::fmt::Debug;
+
 pub mod math;
 pub mod control;
 pub mod filters;
 
 pub use math::{Matrix3x3, Vector3};
 pub use control::PIDController;
+pub use filters::kalman::KalmanFilter;
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+pub trait Number:
+    Sized + Copy + Debug + 
+    Float + FromPrimitive + ToPrimitive + 
+    RealField + ComplexField
+{}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+impl<N> Number for N
+where
+    N: Sized + Copy + Debug +
+    Float + FromPrimitive + ToPrimitive +
+    RealField + ComplexField
+{}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
