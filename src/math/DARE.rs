@@ -25,7 +25,7 @@ use nalgebra::{OMatrix, RealField, DefaultAllocator, Dim, DimName, allocator::Al
 /// # Example
 /// ```
 /// use nalgebra::{OMatrix, U2, U4};
-/// use your_crate::math::dare_sda::solve_dare_sda;
+/// use controlrs::math::DARE::solve_dare_sda;
 ///
 /// let a = OMatrix::<f64, U4, U4>::identity();
 /// let b = OMatrix::<f64, U4, U2>::new(0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);

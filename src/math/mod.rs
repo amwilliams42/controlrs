@@ -5,7 +5,7 @@
 mod vector;
 mod matrix;
 mod quaternion; 
-mod DARE;
+pub mod DARE;
 
 pub use vector::Vector3;
 pub use matrix::Matrix3x3;
