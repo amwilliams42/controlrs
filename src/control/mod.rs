@@ -4,4 +4,4 @@ pub mod pid;
 pub mod lqr;
 
 pub use pid::PIDController;
-pub use lqr::{LQRController,LQRType,Horizon};
+pub use lqr::LQRController;

@@ -1,110 +1,109 @@
 #[cfg(test)]
 mod tests {
-    use nalgebra::{OMatrix, OVector, U1, U2, U3};
-    use controlrs::control::lqr::{LQRController, LQRType, Horizon};
+    use nalgebra::{OMatrix, OVector, U2, U4};
+    use controlrs::control::LQRController;
 
-    // Helper function to create a simple 2x2 continuous-time LQR controller.
-    fn create_continuous_lqr() -> LQRController<f64, U2, U1> {
-        let a = OMatrix::<f64, U2, U2>::new(0.0, 1.0, 0.0, 0.0); // Simple double integrator
-        let b = OMatrix::<f64, U2, U1>::new(0.0, 1.0); // Control input
-        let q = OMatrix::<f64, U2, U2>::identity(); // State cost
-        let r = OMatrix::<f64, U1, U1>::identity() * 0.1; // Control cost
-
-        LQRController::new(a, b, q, r, LQRType::ContinuousTime, Horizon::Infinite, None)
-            .expect("Failed to create continuous-time LQR controller")
-    }
-
-    // Helper function to create a 3x1 discrete-time LQR controller with a finite horizon.
-    fn create_discrete_finite_horizon_lqr() -> LQRController<f64, U3, U1> {
-        let a = OMatrix::<f64, U3, U3>::new(1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
-        let b = OMatrix::<f64, U3, U1>::new(0.0, 0.0, 1.0);
-        let q = OMatrix::<f64, U3, U3>::identity();
-        let r = OMatrix::<f64, U1, U1>::identity() * 0.01;
-        let f = OMatrix::<f64, U3, U3>::identity(); // Terminal cost
-
-        LQRController::new(
-            a,
-            b,
-            q,
-            r,
-            LQRType::DiscreteTime,
-            Horizon::Finite(10),
-            Some(f),
-        )
-        .expect("Failed to create discrete-time finite-horizon LQR controller")
-    }
-
+    /// Test LQR creation with valid system matrices.
     #[test]
-    fn test_continuous_infinite_horizon_lqr_gain() {
-        let lqr = create_continuous_lqr();
-        let k = lqr.get_feedback_gain(0);
-        // Check the dimensions of the gain matrix K (should be 1x2)
-        assert_eq!(k.nrows(), 1);
-        assert_eq!(k.ncols(), 2);
+    fn test_lqr_creation() {
+        let a = OMatrix::<f64, U4, U4>::identity();
+        let b = OMatrix::<f64, U4, U2>::new(0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+        let q = OMatrix::<f64, U4, U4>::identity() * 10.0;
+        let r = OMatrix::<f64, U2, U2>::identity();
+
+        let epsilon = 1e-9;
+        let lqr = LQRController::new(a, b, q, r, epsilon, None);
+        assert!(lqr.is_ok(), "LQR creation should succeed with valid matrices.");
     }
 
+    /// Test that the control input is computed correctly for simple state and target.
     #[test]
-    fn test_compute_control_input_continuous() {
-        let lqr = create_continuous_lqr();
-        let state = OVector::<f64, U2>::new(1.0, 0.0); // Initial state: [1, 0]
-        let control = lqr.compute_control(&state, 0);
-        // Verify the control input's dimension
-        assert_eq!(control.nrows(), 1);
-        assert_eq!(control.ncols(), 1);
+fn test_lqr_control_input() {
+    let a = OMatrix::<f64, U4, U4>::new(
+        1.0, 0.1, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.1,
+        0.0, 0.0, 1.0, 0.1,
+        0.0, 0.0, 0.0, 1.0,
+    );
+
+    let b = OMatrix::<f64, U4, U2>::new(
+        0.0, 0.0,
+        1.0, 0.0,
+        0.0, 0.0,
+        0.0, 1.0,
+    );
+
+    let q = OMatrix::<f64, U4, U4>::identity() * 10.0;
+    let r = OMatrix::<f64, U2, U2>::identity();
+
+    let epsilon = 1e-9;
+    let lqr = LQRController::new(a, b, q, r, epsilon, None).unwrap();
+
+    // Define a non-trivial state and target
+    let state = OVector::<f64, U4>::new(5.0, -2.0, 3.0, 0.5);
+    let target = OVector::<f64, U4>::new(1.0, 1.0, 1.0, 1.0);
+
+    // Compute control input
+    let control = lqr.compute_control(&state, &target);
+
+    // Ensure the control input is non-zero
+    assert!(
+        control.norm() > 1e-3,
+        "Control input should be non-zero for this state and target."
+    );
+}
+
+#[test]
+fn test_recompute_gain() {
+    let a = OMatrix::<f64, U4, U4>::identity();
+    let b = OMatrix::<f64, U4, U2>::new(0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    let q = OMatrix::<f64, U4, U4>::identity() * 10.0;
+    let r = OMatrix::<f64, U2, U2>::identity();
+
+    let epsilon = 1e-9;
+    let mut lqr = LQRController::new(a, b, q, r, epsilon, None).unwrap();
+
+    // Modify the cost matrices
+    lqr.q *= 1.1;
+    lqr.r *= 0.9;
+
+    // Recompute the gain matrix
+    let result = lqr.recompute_gain(epsilon, None);
+    assert!(result.is_ok(), "Gain matrix recomputation should succeed.");
+}
+
+    /// Test that the LQR controller returns an error for non-controllable systems.
+    #[test]
+    fn test_non_controllable_system() {
+        // This system is not controllable because B is all zeros.
+        let a = OMatrix::<f64, U4, U4>::identity();
+        let b = OMatrix::<f64, U4, U2>::zeros(); // Non-controllable system
+        let q = OMatrix::<f64, U4, U4>::identity() * 10.0;
+        let r = OMatrix::<f64, U2, U2>::identity();
+
+        let epsilon = 1e-9;
+        let result = LQRController::new(a, b, q, r, epsilon, None);
+        assert!(
+            result.is_err(),
+            "LQR creation should fail for non-controllable systems."
+        );
     }
 
+    /// Test that LQR handles convergence issues gracefully by limiting iterations.
     #[test]
-    fn test_discrete_finite_horizon_lqr_gain_sequence() {
-        let lqr = create_discrete_finite_horizon_lqr();
-        let k1 = lqr.get_feedback_gain(0);
-        let k2 = lqr.get_feedback_gain(5);
-        let k_final = lqr.get_feedback_gain(9);
+    fn test_lqr_convergence_limit() {
+        let a = OMatrix::<f64, U4, U4>::identity();
+        let b = OMatrix::<f64, U4, U2>::new(0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+        let q = OMatrix::<f64, U4, U4>::identity() * 10.0;
+        let r = OMatrix::<f64, U2, U2>::identity();
 
-        // Check the dimensions of the first gain matrix (should be 1x3)
-        assert_eq!(k1.nrows(), 1);
-        assert_eq!(k1.ncols(), 3);
+        let epsilon = 1e-9;
+        let max_iterations = Some(1); // Force premature exit
 
-        // Verify that the final gain matrix is well-formed
-        assert_eq!(k_final.nrows(), 1);
-        assert_eq!(k_final.ncols(), 3);
-    }
-
-    #[test]
-    fn test_discrete_finite_horizon_control_input() {
-        let lqr = create_discrete_finite_horizon_lqr();
-        let state = OVector::<f64, U3>::new(1.0, 0.0, 0.0); // Initial state: [1, 0, 0]
-        let control = lqr.compute_control(&state, 0);
-
-        // Verify control input dimension
-        assert_eq!(control.nrows(), 1);
-        assert_eq!(control.ncols(), 1);
-    }
-
-    #[test]
-    fn test_discrete_finite_horizon_control_evolution() {
-        let lqr = create_discrete_finite_horizon_lqr();
-        let mut state = OVector::<f64, U3>::new(1.0, 0.0, 0.0); // Initial state
-
-        // Simulate the evolution of the state over 10 steps
-        for t in 0..10 {
-            let control = lqr.compute_control(&state, t);
-            state = lqr.integrate(&state, 1.0, t); // Discrete-time evolution
-            println!("Step {}: State = {:?}", t, state);
-        }
-    }
-
-    #[test]
-    fn test_lqr_infinite_vs_finite_horizon_behavior() {
-        let continuous_lqr = create_continuous_lqr();
-        let discrete_finite_lqr = create_discrete_finite_horizon_lqr();
-
-        let initial_state = OVector::<f64, U2>::new(1.0, 1.0);
-        let control_inf = continuous_lqr.compute_control(&initial_state, 0);
-
-        let initial_state_finite = OVector::<f64, U3>::new(1.0, 0.0, 0.0);
-        let control_finite = discrete_finite_lqr.compute_control(&initial_state_finite, 0);
-
-        println!("Infinite Horizon Control: {:?}", control_inf);
-        println!("Finite Horizon Control: {:?}", control_finite);
+        let result = LQRController::new(a, b, q, r, epsilon, max_iterations);
+        assert!(
+            result.is_err(),
+            "LQR creation should fail if max iterations are too low for convergence."
+        );
     }
 }

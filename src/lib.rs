@@ -6,7 +6,7 @@ pub mod math;
 pub mod control;
 pub mod filters;
 
-pub use math::{Matrix3x3, Vector3};
+pub use math::solve_dare_sda;
 pub use control::PIDController;
 pub use filters::kalman::KalmanFilter;
 pub use filters::ekf::ExtendedKalmanFilter;

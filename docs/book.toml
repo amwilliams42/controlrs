@@ -1,0 +1,6 @@
+[book]
+authors = ["Alex Williams"]
+language = "en"
+multilingual = false
+src = "src"
+title = "ControlRS Documentation and Examples"
