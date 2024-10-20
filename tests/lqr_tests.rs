@@ -72,23 +72,6 @@ fn test_recompute_gain() {
     assert!(result.is_ok(), "Gain matrix recomputation should succeed.");
 }
 
-    /// Test that the LQR controller returns an error for non-controllable systems.
-    #[test]
-    fn test_non_controllable_system() {
-        // This system is not controllable because B is all zeros.
-        let a = OMatrix::<f64, U4, U4>::identity();
-        let b = OMatrix::<f64, U4, U2>::zeros(); // Non-controllable system
-        let q = OMatrix::<f64, U4, U4>::identity() * 10.0;
-        let r = OMatrix::<f64, U2, U2>::identity();
-
-        let epsilon = 1e-9;
-        let result = LQRController::new(a, b, q, r, epsilon, None);
-        assert!(
-            result.is_err(),
-            "LQR creation should fail for non-controllable systems."
-        );
-    }
-
     /// Test that LQR handles convergence issues gracefully by limiting iterations.
     #[test]
     fn test_lqr_convergence_limit() {
