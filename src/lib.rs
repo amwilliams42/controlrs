@@ -7,7 +7,9 @@ pub mod control;
 pub mod filters;
 
 pub use math::solve_dare_sda;
-pub use control::PIDController;
+pub use control::{
+    PIDController,
+    LQRController,};
 pub use filters::kalman::KalmanFilter;
 pub use filters::ekf::ExtendedKalmanFilter;
 

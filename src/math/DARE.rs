@@ -1,5 +1,7 @@
 use nalgebra::{OMatrix, RealField, DefaultAllocator, Dim, DimName, allocator::Allocator};
 
+use crate::Number;
+
 /// Solves the Discrete Algebraic Riccati Equation (DARE) using the Structured Doubling Algorithm (SDA).
 ///
 /// # Overview
@@ -49,7 +51,7 @@ pub fn solve_dare_sda<T, R, C>(
     max_iterations: Option<usize>,
 ) -> Result<OMatrix<T, R, R>, &'static str>
 where
-    T: RealField,
+    T: Number,
     R: Dim + DimName,
     C: Dim + DimName,
     DefaultAllocator: Allocator<R, R>
@@ -59,30 +61,35 @@ where
 {
     // Initialize matrices A_0, G_0, and H_0
     let mut a_k = a.clone();
-    let g_0 = b * r.clone().try_inverse().unwrap() * b.transpose();
+    let g_0 = b * r.clone().try_inverse()
+        .ok_or("R matrix is not invertible")? * b.transpose();
     let mut g_k = g_0.clone();
     let mut h_k = q.clone();
 
+    let mut workspace = OMatrix::<T, R, R>::zeros();
+    let identity = OMatrix::<T, R, R>::identity();
     let mut iteration = 0;
     loop {
         // Compute (I + G_k * H_k)^-1
-        let identity = OMatrix::<T, R, R>::identity();
-        let inv_term = (identity.clone() + &g_k * &h_k)
-            .try_inverse()
+        workspace.copy_from(&identity);
+        workspace += &g_k * &h_k;
+        
+        let inv_term = workspace.clone().try_inverse()
             .ok_or("Matrix inversion failed")?;
 
-        // Update A_{k+1}
+        // Update A_{k+1}, G_{k+1}, H_{k+1}
         let a_next = &a_k * &inv_term * &a_k;
-
-        // Update G_{k+1}
         let g_next = &g_k + &a_k * &inv_term * &g_k * a_k.transpose();
-
-        // Update H_{k+1}
         let h_next = &h_k + a_k.transpose() * &h_k * &inv_term * &a_k;
 
-        // Check for convergence
+        // Check for convergence and numerical stability
         let diff = (&h_next - &h_k).norm();
         let norm = h_next.norm();
+        
+        if norm.is_infinite() || norm.is_nan() {
+            return Err("Solution diverged");
+        }
+        
         if diff / norm < epsilon {
             return Ok(h_next);
         }
