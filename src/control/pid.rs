@@ -1,137 +1,165 @@
-//! Proportional Integral Derivative controller implementation
-//!
-//! 
+use nalgebra::RealField;
+use num_traits::Signed;
 
-type OptValue = Option<(f32,f32)>;
+/*
+# Overview
+
+A PID controller continuously calculates an error value as the difference between a desired setpoint and a measured process variable. The controller attempts to minimize the error by adjusting the process control inputs. The PID controller algorithm involves three separate parameters: the proportional, integral, and derivative values, denoted as `kp`, `ki`, and `kd` respectively.
+
+- **Proportional (P)**: The proportional term produces an output value that is proportional to the current error value. It is calculated by multiplying the error by a constant `kp`.
+- **Integral (I)**: The integral term is concerned with the accumulation of past errors. If the error has been present for a long time, the integral term will accumulate a significant value. It is calculated by multiplying the accumulated error by a constant `ki`.
+- **Derivative (D)**: The derivative term is a prediction of future error, based on its rate of change. It is calculated by multiplying the rate of change of the error by a constant `kd`.
+
+# Usage
+
+To use the PID controller, create an instance of `PIDController` with the desired gains and setpoint. The controller can then be used to compute the control output based on the current process variable.
+
+# Example
+
+```rust
+use pid::PIDController;
+use pid::Number;
+
+let mut pid = PIDController::new(1.0, 0.1, 0.01, 10.0);
+let control_output = pid.update(5.0, 1.0);
+```
+*/
+use crate::Number;
+use super::ControlSystem;
 
 
 #[derive(Debug, Clone, Copy)]
-pub struct PIDController {
-    pub kp: f32,                 // Proportional Gain
-    pub ki: f32,                 // Integral Gain
-    pub kd: f32,                 // Derivative Gain
-    pub setpoint: f32,           // Desired setpoint
-    pub integral: f32,           // Accumulated Integral term
-    pub previous_error: f32,         // error from previous update
-    pub previous_measurement: f32,   // measurement from prev update
-    pub output_limits: OptValue, // Optional, limits on output
-    pub p_limit: OptValue,       // Optional, limits on p
-    pub d_limit: OptValue,       // Optional, limits on d
-    pub i_limit: OptValue,       // Optional, limits on i
+pub struct PIDController<N: Number>{
+    pub kp: N,                 // Proportional Gain
+    pub ki: N,                 // Integral Gain
+    pub kd: N,                 // Derivative Gain
+    pub setpoint: N,           // Desired setpoint
+    pub integral: N,           // Accumulated Integral term
+    pub previous_error: N,     // error from previous update
+    pub prev_filtered_derivative: N, // Previous filtered derivative
+
+    pub integral_limit: Option<N>, // Integral windup limit
+    pub derivative_filter_coefficient: N, // Derivative filter
+    pub max_rate: Option<N>,       // Maximum rate of change
+    pub prev_output: N,            // Previous output
+
+    pub deadband: Option<N>,               // Deadband
 }
 
-/// PID controller builder
-///
-/// This struct is used to configure and create a PIDController instance.
-pub struct PIDControllerBuilder {
-    kp: f32,
-    ki: f32,
-    kd: f32,
-    setpoint: f32,
-    output_limits: Option<(f32, f32)>,
-    p_limit: Option<(f32, f32)>,
-    i_limit: Option<(f32, f32)>,
-    d_limit: Option<(f32, f32)>,
-}
-
-impl PIDControllerBuilder {
-    /// Create a new PID controller builder
-    ///
-    /// # Arguments
-    ///
-    /// * `kp` - Proportional gain
-    /// * `ki` - Integral gain
-    /// * `kd` - Derivative gain
-    /// * `setpoint` - Desired setpoint
-    pub fn new(kp: f32, ki: f32, kd: f32, setpoint: f32) -> Self {
-        PIDControllerBuilder {
+impl<N: Number> PIDController<N> {
+    pub fn new(kp: N, ki: N, kd: N, setpoint: N) -> Self {
+        PIDController {
             kp,
             ki,
             kd,
             setpoint,
-            output_limits: None,
-            p_limit: None,
-            i_limit: None,
-            d_limit: None,
+            integral: N::zero(),
+            previous_error: N::zero(),
+            prev_filtered_derivative: N::zero(),
+            integral_limit: None,
+            derivative_filter_coefficient: N::one(),
+            max_rate: None,
+            prev_output: N::zero(),
+            deadband: None,
+
         }
     }
-    pub fn with_output_limits(mut self, min:f32, max: f32) -> Self {
-        self.output_limits = Some((min,max));
-        self
-    }
-    pub fn with_p_limits(mut self, min: f32, max: f32) -> Self {
-        self.p_limit = Some((min, max));
-        self
-    }
-    pub fn with_i_limits(mut self, min: f32, max: f32) -> Self {
-        self.i_limit = Some((min, max));
-        self
-    }
-    pub fn with_d_limits(mut self, min: f32, max: f32) -> Self {
-        self.d_limit = Some((min, max));
+
+    pub fn with_integral_limit(mut self, limit: N) -> Self {
+        self.integral_limit = Some(limit);
         self
     }
 
-    /// Build the PID controller
-    pub fn build(self) -> PIDController {
-        PIDController {
-            kp: self.kp,
-            ki: self.ki,
-            kd: self.kd,
-            setpoint: self.setpoint,
-            integral: 0.0,
-            previous_error: 0.0,
-            previous_measurement: 0.0,
-            output_limits: self.output_limits,
-            p_limit: self.p_limit,
-            i_limit: self.i_limit,
-            d_limit: self.d_limit,
-        }
+    pub fn with_derivative_filter(mut self, coefficient: N) -> Self {
+        self.derivative_filter_coefficient = coefficient;
+        self
+    }
+
+    pub fn with_rate_limit(mut self, limit: N) -> Self {
+        self.max_rate = Some(limit);
+        self
+    }
+
+    pub fn with_deadband(mut self, deadband: N) -> Self {
+        self.deadband = Some(deadband);
+        self
+    }
+
+    pub fn set_gains(&mut self, kp: N, ki: N, kd: N) {
+        self.kp = kp;
+        self.ki = ki;
+        self.kd = kd;
+    }
+
+    pub fn set_setpoint(&mut self, setpoint: N) {
+        self.setpoint = setpoint;
     }
 }
 
-impl PIDController {
-    /// Convenience function for a PID controller builder
-    pub fn builder(
-        kp: f32, 
-        ki: f32, 
-        kd: f32, 
-        setpoint: f32) 
-        -> PIDControllerBuilder {
-            PIDControllerBuilder::new(kp,ki,kd,setpoint)
-    }
+impl<N: Number> ControlSystem for PIDController<N> 
+where N: Number{
+    type Input = N;
 
-    pub fn update(&mut self, measurement: f32, dt: f32) -> f32 {
-        let error = self.setpoint - measurement;
+    type Output = N;
 
-        let mut p_term = self.kp * error;
-        if let Some((min,max)) = self.p_limit {
-            p_term = p_term.clamp(min, max);
-        }
+    type State = (N, N); // (integral, previous_error)
 
+    type Time = N;
+
+    fn step(&mut self, input: Self::Input, dt: Self::Time) -> Self::Output {
+        let error = self.setpoint - input;
+
+        // Apply deadband
+        let error = if let Some(deadband) = self.deadband {
+            if Signed::abs(&error) < deadband {
+                N::zero()
+            } else {
+                error
+            }
+        } else {
+            error
+        };
+
+        // Update Integral term with windup limit
         self.integral += error * dt;
-        let mut i_term = self.ki * self.integral;
-        if let Some((min,max)) = self.i_limit {
-            i_term = i_term.clamp(min, max);
-            self.integral = i_term / self.ki;
+        if let Some(limit) = self.integral_limit {
+            self.integral = RealField::clamp(self.integral, -limit, limit);
         }
 
-        let d_input = (measurement - self.previous_measurement) / dt;
-        // Negative because we want to counteract the change
-        let mut d_term = -self.kd * d_input; 
-        if let Some((min, max)) = self.d_limit {
-            d_term = d_term.clamp(min, max);
-        }
+        // Calculate Derivative term
+        let derivative = (error - self.previous_error) / dt;
 
-        let mut output = p_term + i_term + d_term;
+        let filtered_derivative = 
+            self.derivative_filter_coefficient * 
+            derivative + 
+            (N::one() - self.derivative_filter_coefficient) *
+            self.prev_filtered_derivative;
 
-        if let Some((min, max)) = self.output_limits {
-            output = output.clamp(min, max)
-        }
-
+        self.prev_filtered_derivative = filtered_derivative;
         self.previous_error = error;
-        self.previous_measurement = measurement;
 
+        // PID output
+        let mut output = self.kp * error + self.ki * self.integral + self.kd * derivative;
+
+        if let Some(max_rate) = self.max_rate {
+            let rate = (output - self.prev_output) / dt;
+            if Signed::abs(&rate) > max_rate {
+                output = self.prev_output + max_rate * Signed::signum(&rate) * dt;
+            }
+            output = self.prev_output + RealField::clamp(rate, -max_rate, max_rate) * dt;
+        }
+        self.prev_output = output;
         output
     }
+
+    fn reset(&mut self) {
+        self.integral = N::zero();
+        self.previous_error = N::zero();
+        self.prev_filtered_derivative = N::zero();
+        self.prev_output = N::zero();
+    }
+
+    fn get_state(&self) -> Self::State {
+            (self.integral, self.previous_error)
+        }
 }
