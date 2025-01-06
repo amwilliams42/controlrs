@@ -145,8 +145,8 @@ where N: Number{
             let rate = (output - self.prev_output) / dt;
             if Signed::abs(&rate) > max_rate {
                 output = self.prev_output + max_rate * Signed::signum(&rate) * dt;
-            }
-            output = self.prev_output + RealField::clamp(rate, -max_rate, max_rate) * dt;
+            } else {
+                output = self.prev_output + RealField::clamp(rate, -max_rate, max_rate) * dt; }
         }
         self.prev_output = output;
         output
