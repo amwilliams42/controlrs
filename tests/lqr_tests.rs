@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
     use approx::assert_relative_eq;
     use nalgebra::{Matrix2, Matrix2x1, Matrix1};
     use controlrs::{control::ControlSystem, LQRController};

@@ -1,4 +1,4 @@
-use nalgebra::{OMatrix, RealField, DefaultAllocator, Dim, DimName, allocator::Allocator};
+use nalgebra::{OMatrix, DefaultAllocator, Dim, DimName, allocator::Allocator};
 
 use crate::Number;
 

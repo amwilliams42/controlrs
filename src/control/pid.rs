@@ -27,23 +27,22 @@ let control_output = pid.update(5.0, 1.0);
 use crate::Number;
 use super::ControlSystem;
 
-
 #[derive(Debug, Clone, Copy)]
-pub struct PIDController<N: Number>{
-    pub kp: N,                 // Proportional Gain
-    pub ki: N,                 // Integral Gain
-    pub kd: N,                 // Derivative Gain
-    pub setpoint: N,           // Desired setpoint
-    pub integral: N,           // Accumulated Integral term
-    pub previous_error: N,     // error from previous update
+pub struct PIDController<N: Number> {
+    pub kp: N, // Proportional Gain
+    pub ki: N, // Integral Gain
+    pub kd: N, // Derivative Gain
+    pub setpoint: N, // Desired setpoint
+    pub integral: N, // Accumulated Integral term
+    pub previous_error: N, // error from previous update
     pub prev_filtered_derivative: N, // Previous filtered derivative
 
     pub integral_limit: Option<N>, // Integral windup limit
     pub derivative_filter_coefficient: N, // Derivative filter
-    pub max_rate: Option<N>,       // Maximum rate of change
-    pub prev_output: N,            // Previous output
+    pub max_rate: Option<N>, // Maximum rate of change
+    pub prev_output: N, // Previous output
 
-    pub deadband: Option<N>,               // Deadband
+    pub deadband: Option<N>, // Deadband
 }
 
 impl<N: Number> PIDController<N> {
@@ -61,7 +60,6 @@ impl<N: Number> PIDController<N> {
             max_rate: None,
             prev_output: N::zero(),
             deadband: None,
-
         }
     }
 
@@ -96,8 +94,7 @@ impl<N: Number> PIDController<N> {
     }
 }
 
-impl<N: Number> ControlSystem for PIDController<N> 
-where N: Number{
+impl<N: Number> ControlSystem for PIDController<N> where N: Number {
     type Input = N;
 
     type Output = N;
@@ -111,11 +108,7 @@ where N: Number{
 
         // Apply deadband
         let error = if let Some(deadband) = self.deadband {
-            if Signed::abs(&error) < deadband {
-                N::zero()
-            } else {
-                error
-            }
+            if Signed::abs(&error) < deadband { N::zero() } else { error }
         } else {
             error
         };
@@ -129,11 +122,9 @@ where N: Number{
         // Calculate Derivative term
         let derivative = (error - self.previous_error) / dt;
 
-        let filtered_derivative = 
-            self.derivative_filter_coefficient * 
-            derivative + 
-            (N::one() - self.derivative_filter_coefficient) *
-            self.prev_filtered_derivative;
+        let filtered_derivative =
+            self.derivative_filter_coefficient * derivative +
+            (N::one() - self.derivative_filter_coefficient) * self.prev_filtered_derivative;
 
         self.prev_filtered_derivative = filtered_derivative;
         self.previous_error = error;
@@ -145,8 +136,9 @@ where N: Number{
             let rate = (output - self.prev_output) / dt;
             if Signed::abs(&rate) > max_rate {
                 output = self.prev_output + max_rate * Signed::signum(&rate) * dt;
+            } else {
+                output = self.prev_output + RealField::clamp(rate, -max_rate, max_rate) * dt;
             }
-            output = self.prev_output + RealField::clamp(rate, -max_rate, max_rate) * dt;
         }
         self.prev_output = output;
         output
@@ -160,6 +152,6 @@ where N: Number{
     }
 
     fn get_state(&self) -> Self::State {
-            (self.integral, self.previous_error)
-        }
+        (self.integral, self.previous_error)
+    }
 }

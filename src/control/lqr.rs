@@ -1,5 +1,4 @@
-use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, DimMin, DimName, OMatrix, OVector, RealField, U1};
-use num_traits::real::Real;
+use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, DimMin, DimName, OMatrix, OVector, U1};
 use crate::{solve_dare_sda, Number};
 
 use super::ControlSystem;

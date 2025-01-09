@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use controlrs::{control::ControlSystem, PIDController};
 
 struct HeatingSystem {

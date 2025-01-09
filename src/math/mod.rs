@@ -5,17 +5,17 @@
 mod vector;
 mod matrix;
 mod quaternion; 
-pub mod DARE;
+pub mod dare;
 
 pub use vector::Vector3;
 pub use matrix::Matrix3x3;
 pub use quaternion::Quaternion;
-pub use DARE::solve_dare_sda;
+pub use dare::solve_dare_sda;
 
 /// Constant for π
 pub const PI: f32 = 3.14159265358979323846;
 
-/// Convert degrees to radians
+/// Convert degrees to radians 
 #[inline]
 pub fn deg_to_rad(deg: f32) -> f32 {
     deg * PI / 180.0
